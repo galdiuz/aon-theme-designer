@@ -2,12 +2,15 @@ module AonThemeDesigner exposing (main)
 
 import Browser
 import Dict exposing (Dict)
-import Json.Decode as Decode
-import Json.Encode as Encode
+import Float.Extra
+import Hex
 import Html exposing (Html)
 import Html.Attributes as HA
 import Html.Attributes.Extra as HAE
 import Html.Events as HE
+import Json.Decode as Decode
+import Json.Encode as Encode
+import List.Extra
 import Regex exposing (Regex)
 
 
@@ -151,6 +154,7 @@ view model =
                 , HA.class "flex1"
                 ]
                 [ viewInputs model
+                , viewContrast model
                 , viewShare model
                 ]
             , viewPreview
@@ -234,6 +238,110 @@ viewColorInput model color =
             ]
         , Html.text color.label
         ]
+
+
+viewContrast : Model -> Html msg
+viewContrast model =
+    let
+        getColor : String -> ColorDef
+        getColor key =
+            List.Extra.find (.key >> (==) key) colors
+                |> Maybe.withDefault
+                    { key = ""
+                    , label = ""
+                    , default = "#000000"
+                    }
+
+        lowContrastPairs : List ( ColorDef, ColorDef )
+        lowContrastPairs =
+            List.filterMap
+                (\( a, b ) ->
+                    if contrast (getHex model (getColor a)) (getHex model (getColor b)) < 3 then
+                        Just ( getColor a, getColor b )
+
+                    else
+                        Nothing
+                )
+                contrastPairs
+    in
+    if List.isEmpty lowContrastPairs then
+        Html.text ""
+
+    else
+        Html.div
+            [ HA.class "column"
+            , HA.class "gap-medium"
+            ]
+            (List.append
+                [ Html.div
+                    [ HA.style "font-size" "20px" ]
+                    [ Html.text "Warning: Low contrast" ]
+                , Html.div
+                    []
+                    [ Html.text "The following pairs have low contrast and might be difficult to read:" ]
+                ]
+                (List.map
+                    (\( a, b ) ->
+                        Html.div
+                            [ HA.class "row"
+                            , HA.class "gap-small"
+                            ]
+                            [ Html.div
+                                []
+                                [ Html.div
+                                    [ HA.style "width" "20px"
+                                    , HA.style "height" "20px"
+                                    , HA.style "background-color" (getHex model a)
+                                    , HA.style "border" "1px solid white"
+                                    , HA.style "border-bottom" "none"
+                                    ]
+                                    []
+                                , Html.div
+                                    [ HA.style "width" "20px"
+                                    , HA.style "height" "20px"
+                                    , HA.style "background-color" (getHex model b)
+                                    , HA.style "border" "1px solid white"
+                                    , HA.style "border-top" "none"
+                                    ]
+                                    []
+                                ]
+                            , Html.div
+                                [ HA.class "column"
+                                , HA.class "gap-small"
+                                ]
+                                [ Html.div
+                                    []
+                                    [ Html.text a.label ]
+                                , Html.div
+                                    []
+                                    [ Html.text b.label ]
+                                ]
+                            ]
+                    )
+                    lowContrastPairs
+                )
+            )
+
+
+contrastPairs : List ( String, String )
+contrastPairs =
+    [ ( "bg-main", "text-1" )
+    , ( "bg-main", "ext-link" )
+    , ( "bg-0", "text-1" )
+    , ( "head-bg", "head-fg" )
+    , ( "mid-bg", "mid-fg" )
+    , ( "sub-bg", "sub-fg" )
+    , ( "header4-bg", "header4-fg" )
+    , ( "header5-bg", "header5-fg" )
+    , ( "header6-bg", "header6-fg" )
+    , ( "border-1", "text-1" )
+    , ( "mid-bg", "text-1" )
+    , ( "sub-bg", "text-1" )
+    , ( "bg-1", "text-1" )
+    , ( "bg-1", "text-2" )
+    , ( "bg-2", "text-2" )
+    , ( "hovered-bg", "hovered-fg" )
+    ]
 
 
 viewShare : Model -> Html Msg
@@ -511,7 +619,6 @@ viewPreview =
                 [ HA.class "active" ]
                 [ Html.text "Active button" ]
             ]
-
         , Html.div
             [ HA.class "input-container"
             , HA.class "row"
@@ -691,6 +798,52 @@ previewCss model =
         ]
 
 
+hexToRgb : String -> ( Int, Int, Int )
+hexToRgb hex =
+    ( String.slice 1 3 hex
+        |> Hex.fromString
+        |> Result.withDefault 0
+    , String.slice 3 5 hex
+        |> Hex.fromString
+        |> Result.withDefault 0
+    , String.slice 5 7 hex
+        |> Hex.fromString
+        |> Result.withDefault 0
+    )
+
+
+luminance : ( Int, Int, Int ) -> Float
+luminance ( r, g, b ) =
+    let
+        f : Float -> Float
+        f v =
+            if v <= 0.03928 then
+                v / 12.92
+
+            else
+                ((v + 0.055) / 1.055) ^ 2.4
+    in
+    List.sum
+        [ 0.2126 * f (toFloat r / 255)
+        , 0.7152 * f (toFloat g / 255)
+        , 0.0722 * f (toFloat b / 255)
+        ]
+
+
+contrast : String -> String -> Float
+contrast a b =
+    let
+        lumA : Float
+        lumA =
+            luminance (hexToRgb a)
+
+        lumB : Float
+        lumB =
+            luminance (hexToRgb b)
+    in
+    ((max lumA lumB) + 0.05) / ((min lumA lumB) + 0.05)
+
+
 css : String
 css =
     """
@@ -868,7 +1021,7 @@ css =
     }
 
     .hover {
-        background-color: var(--head-bg);
+        background-color: var(--bg-main);
         color: var(--text-1);
         border: 1px solid var(--text-1);
         padding: 8px;

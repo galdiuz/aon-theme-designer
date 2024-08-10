@@ -12,7 +12,8 @@
             "elm/json": "1.1.3",
             "elm/regex": "1.0.0",
             "elm-community/html-extra": "3.4.0",
-            "elmcraft/core-extra": "2.0.0"
+            "elmcraft/core-extra": "2.0.0",
+            "rtfeldman/elm-hex": "1.0.0"
         },
         "indirect": {
             "elm/time": "1.0.0",
