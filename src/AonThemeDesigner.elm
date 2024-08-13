@@ -1,8 +1,7 @@
-module AonThemeDesigner exposing (main)
+port module AonThemeDesigner exposing (main)
 
 import Browser
 import Dict exposing (Dict)
-import Float.Extra
 import Hex
 import Html exposing (Html)
 import Html.Attributes as HA
@@ -14,6 +13,10 @@ import List.Extra
 import Regex exposing (Regex)
 
 
+port applyColors : Encode.Value -> Cmd msg
+port clearColors : () -> Cmd msg
+
+
 type alias Model =
     { colors : Dict String String
     , colorInputs : Dict String String
@@ -23,7 +26,9 @@ type alias Model =
 
 
 type Msg
-    = ColorChanged String String
+    = ApplyColorsPressed
+    | ClearColorsPressed
+    | ColorChanged String String
     | ColorInputChanged String String
     | SchemeChanged String
     | ShareInputChanged String
@@ -66,6 +71,16 @@ subscriptions model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        ApplyColorsPressed ->
+            ( model
+            , applyColors (encodeColors model)
+            )
+
+        ClearColorsPressed ->
+            ( model
+            , clearColors ()
+            )
+
         ColorChanged key value ->
             ( { model
                 | colors = Dict.insert key value model.colors
@@ -156,6 +171,7 @@ view model =
                 [ viewInputs model
                 , viewContrast model
                 , viewShare model
+                , viewApply
                 ]
             , viewPreview
             ]
@@ -361,6 +377,31 @@ viewShare model =
                 ]
                 []
             ]
+        ]
+
+
+viewApply : Html Msg
+viewApply =
+    Html.div
+        [ HA.class "column"
+        , HA.class "gap-small"
+        ]
+        [ Html.div
+            [ HA.class "row"
+            , HA.class "gap-small"
+            ]
+            [ Html.button
+                [ HE.onClick ApplyColorsPressed
+                , HA.style "align-self" "flex-start"
+                ]
+                [ Html.text "Apply to site" ]
+            , Html.button
+                [ HE.onClick ClearColorsPressed
+                , HA.style "align-self" "flex-start"
+                ]
+                [ Html.text "Restore original" ]
+            ]
+        , Html.text "Use these buttons to apply your theme to the site or to restore the original theme."
         ]
 
 
@@ -1033,10 +1074,10 @@ css =
     }
 
     button {
-        border: 1px solid color-mix(in lch, var(--text-1), #808080);
+        border: 1px solid color-mix(in lch, var(--text-1, #eeeeee), #808080);
         border-radius: 4px;
         background-color: transparent;
-        color: var(--text-1);
+        color: var(--text-1, #eeeeee);
         font-size: 16px;
         padding: 1px 6px;
         font-family: inherit;
